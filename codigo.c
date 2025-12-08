@@ -8,15 +8,15 @@
 
 //Bibliotecas para o LCD
 #include <WiFi.h>
-//#include <PubSubClient.h>
+#include <PubSubClient.h>
 #include <Arduino.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h> 
 
-/*const char* WIFI_SSID = "WIFI 2.4G";
-const char* WIFI_SENHA = "";
+/*const char* WIFI_SSID = "luaninha";
+const char* WIFI_SENHA = "semsenha";
 
-const char* MQTT_SERVER_IP = "";
+const char* MQTT_SERVER_IP = "192.168.108.194";
 const int MQTT_PORT = 1883;
 
 const char* MQTT_TOPIC = "/ESP32/SENSORES";
@@ -25,10 +25,10 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 long lastMsg = 0;
-int counter = 0;*/
+int counter = 0;
 
 // Função para conectar ao Wi-Fi
-/*void setup_wifi() {
+  void setup_wifi() {
   delay(10);
   Serial.println();
   Serial.print("Conectando-se ao ");
@@ -169,7 +169,7 @@ void loop() {
     display.setCursor(0,0); 
     display.print("Modo: MANOBRA"); 
     display.setCursor(0,1); 
-    display.print("Distancia"); display.print(distancia); display.print("cm");
+    display.print("Distancia  "); display.print(distancia); display.print("cm");
 
   // Lógica do Sensor de Ré
   if (distancia > 300) {
@@ -216,12 +216,14 @@ void loop() {
 
     if (intrusaoDetectada) {
       // ALERTA DE INTRUSÃO
-      Serial.println("INTRUSÃO DETECTADA");
+      Serial.println("INTRUSAO DETECTADA");
 
       display.setCursor(0,0); 
       display.print("ALERTA"); 
       display.setCursor(0,1); 
-      display.print("!!INTRUSÃO!!");
+      display.print("!INTRUSAO!");
+
+      //client.publish("/ESP32/INTRUSAO", "ALARME_DISPARADO");
 
       // Ativa o alarme
       digitalWrite(ledGreen, LOW);
@@ -290,14 +292,20 @@ void loop() {
 
   if (novoModo) {
     Serial.println("\n--- MODO: SEGURANÇA (Carro Parado) ---");
+
+    //client.publish("/ESP32/STATUS_MODO", "SEGURANCA");
+
     display.setCursor(0,0); 
-    display.print("Modo:"); 
+    display.print("Modo: "); 
     display.setCursor(0,1); 
-    display.print("Segurança");
+    display.print("Seguranca");
   } else {
     Serial.println("\n--- MODO: MANOBRA (Sensor de Ré) ---");
+
+    //client.publish("/ESP32/STATUS_MODO", "MANOBRA");
+
     display.setCursor(0,0); 
-    display.print("Modo:"); 
+    display.print("Modo: "); 
     display.setCursor(0,1); 
     display.print("Manobra");
   }
