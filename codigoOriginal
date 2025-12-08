@@ -1,0 +1,347 @@
+/******************************************************************************/
+/*     Projeto: Sensor de ré automotivo integrado com Alerta de Intrusão      */
+/*                     Luana Karoline e Emilly Félix                          */
+/******************************************************************************/
+
+//Possível configuração de Distancia Mínima em centimetros para testes
+//const int distancia_carro = 20; 
+
+//Bibliotecas para o LCD
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <Arduino.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h> 
+
+/*const char* WIFI_SSID = "luaninha";
+const char* WIFI_SENHA = "semsenha";
+
+const char* MQTT_SERVER_IP = "192.168.108.194";
+const int MQTT_PORT = 1883;
+
+const char* MQTT_TOPIC = "/ESP32/SENSORES";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+long lastMsg = 0;
+int counter = 0;
+
+// Função para conectar ao Wi-Fi
+  void setup_wifi() {
+  delay(10);
+  Serial.println();
+  Serial.print("Conectando-se ao ");
+  Serial.println(WIFI_SSID);
+
+  WiFi.begin(WIFI_SSID, WIFI_SENHA);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi conectado!");
+  Serial.print("Endereço IP do ESP32: ");
+  Serial.println(WiFi.localIP());
+}
+
+// Função para reconectar ao MQTT (caso a conexão caia)
+void reconnect() {
+  // Loop até reconectar
+  while (!client.connected()) {
+    Serial.print("Tentando conexão MQTT...");
+    
+    // Crie um ID de cliente único
+    String clientId = "ESP32Client-";
+    clientId += String(random(0xffff), HEX);
+
+    // Tenta conectar
+    if (client.connect(clientId.c_str())) {
+      Serial.println("Conectado!");
+      
+      // (Opcional) Se inscrever em tópicos, se precisar
+      // client.subscribe("topico/de/comando");
+
+      } else {
+      Serial.print("Falha, rc=");
+      Serial.print(client.state());
+      Serial.println(" Tentando novamente em 5 segundos");
+      // Espera 5 segundos antes de tentar novamente
+      delay(5000);
+    }
+  }
+}*/
+
+//Configurações de Portas do ESP32
+
+// Pinos dos Sensores de Alerta
+const int SENSOR_VIBRACAO = 13;  // SW-420 - Entrada Digital
+const int SENSOR_INCLINACAO = 27; // SW-520D - Entrada Digital
+
+//LCD
+#define lin 2
+#define col 16
+#define index 0x27
+
+LiquidCrystal_I2C display(index,col,lin);
+
+//Sensor ultrassônico
+const int TRIG = 19;
+const int ECHO = 18;
+
+//sensor para o alerta de intrusão 
+
+// Leds
+const int ledGreen = 4;
+const int ledRed = 5;
+const int ledYellow = 2;
+
+//Botão
+bool modo_seguranca = true; // true = SEGURANÇA, false = MANOBRA
+const int botao_modo = 12;
+
+//Buzzer
+const int buzzer = 14;
+
+// Variaveis para funcionamento do Buzzer
+float seno;
+int frequencia;
+
+//funções
+int pulso_distancia(int pinotrig,int pinoecho);
+void tocaBuzzer();
+
+void setup() {
+  Serial.begin(9600);
+  Serial.println("Iniciando dispositivo.");
+
+  //setup_wifi();
+  //client.setServer(MQTT_SERVER_IP, MQTT_PORT);
+
+  //inicialização do display
+  display.init();
+  display.backlight();
+  display.clear();
+
+  // Configuração dos Pinos
+  pinMode(SENSOR_VIBRACAO, INPUT); 
+  pinMode(SENSOR_INCLINACAO, INPUT); 
+  
+  
+  // Inicialização do Sensor Ultrassônico
+  pinMode(TRIG,OUTPUT);
+  pinMode(ECHO,INPUT);
+  
+  // Inicialização dos LEDs
+  pinMode(ledGreen, OUTPUT);
+  pinMode(ledRed, OUTPUT);
+  pinMode(ledYellow, OUTPUT);
+
+  //Inicialização do Buzzer
+  pinMode(buzzer, OUTPUT); 
+
+  // Configuração do Botão com PULLUP
+  pinMode(botao_modo, INPUT_PULLUP);
+  
+}
+
+
+void loop() {
+
+  // 1. Verifica e alterna o modo (se o botão for pressionado)
+  modo_seguranca = alternarModo(modo_seguranca);
+
+  // Lê sensores
+  int distancia = pulso_distancia(TRIG, ECHO);
+  int vibracao_status = digitalRead(SENSOR_VIBRACAO);
+  int inclinacao_status = digitalRead(SENSOR_INCLINACAO);
+
+  // Se estiver no modo MANOBRA (modo_seguranca == false)
+  // ---------- MODO MANOBRA ----------
+  if (modo_seguranca == false) {
+
+    display.clear();
+    display.setCursor(0,0);
+    display.print("Modo: MANOBRA");
+
+    // ---- Lógica do sensor de ré ----
+
+    if (distancia > 300) {
+      Serial.printf("LIVRE: %d cm\n", distancia);
+
+      digitalWrite(ledGreen, HIGH);
+      digitalWrite(ledYellow, LOW);
+      digitalWrite(ledRed, LOW);
+      noTone(buzzer);
+
+      display.setCursor(0,1);
+      display.print("Livre: ");
+      display.print(distancia);
+      display.print("cm");
+
+    } 
+    else if (distancia > 50) {
+      Serial.printf("ATENCAO: %d cm\n", distancia);
+
+      digitalWrite(ledGreen, LOW);
+      digitalWrite(ledYellow, HIGH);
+      digitalWrite(ledRed, LOW);
+      noTone(buzzer);
+
+      display.setCursor(0,1);
+      display.print("Atenção: ");
+      display.print(distancia);
+      display.print("cm");
+
+    } 
+    else {
+      Serial.printf("PERIGO: %d cm\n", distancia);
+
+      digitalWrite(ledGreen, LOW);
+      digitalWrite(ledYellow, LOW);
+      digitalWrite(ledRed, HIGH);
+      tocaBuzzer();
+
+      display.setCursor(0,1);
+      display.print("PERIGO: ");
+      display.print(distancia);
+      display.print("cm");
+    }
+
+  
+  // Se estiver no modo SEGURANÇA (modo_seguranca == true)
+  }else {
+    // Checa os sensores de intrusão
+    bool intrusaoDetectada = (digitalRead(SENSOR_VIBRACAO) == LOW || digitalRead(SENSOR_INCLINACAO) == LOW);
+
+    display.clear();
+
+    if (intrusaoDetectada) {
+      // ALERTA DE INTRUSÃO
+      Serial.println("INTRUSAO DETECTADA");
+
+      display.setCursor(0,0); 
+      display.print("ALERTA"); 
+      display.setCursor(0,1); 
+      display.print("!INTRUSAO!");
+
+      //client.publish("/ESP32/INTRUSAO", "ALARME_DISPARADO");
+
+      // Ativa o alarme
+      digitalWrite(ledGreen, LOW);
+      digitalWrite(ledYellow, LOW);
+      digitalWrite(ledRed, HIGH); // LED vermelho de alerta
+      tocaBuzzer();
+
+    } else {
+      // MODO SEGURANÇA ATIVO (SEM INTRUSÃO)
+      display.setCursor(0,0); 
+      display.print("Modo Seguranca"); 
+      display.setCursor(0,1); 
+      display.print("Ativo");
+
+      // Mantém atuadores desligados e LED Verde ligado
+      digitalWrite(ledGreen, HIGH);
+      digitalWrite(ledYellow, LOW);
+      digitalWrite(ledRed, LOW);
+      noTone(buzzer);
+    }
+
+  }
+
+  delay(100);
+}
+
+//  FUNÇÕES AUXILIARES
+
+  // Função para calcular a distância do ultrassônico
+  int pulso_distancia(int pinotrig,int pinoecho){
+    digitalWrite(pinotrig,LOW);
+    delayMicroseconds(2);  
+    digitalWrite(pinotrig,HIGH);
+    delayMicroseconds(10);
+    digitalWrite(pinotrig,LOW);
+
+    // Converte a duração do pulso para distância em cm (Duração / 58)
+    return pulseIn(pinoecho,HIGH)/58;
+  }
+
+  // Função para execução do Alarme Sonoro (tom senoidal crescente/decrescente)
+  void tocaBuzzer(){
+    for(int x=0;x<180;x++){
+      seno=(sin(x*3.1416/180));
+      frequencia = 2000+(int(seno*1000));
+      tone(buzzer,frequencia);
+      delay(2);
+    }
+  // Garante que o tom termine após o ciclo
+  noTone(buzzer);
+  }
+
+  // Função para alternar entre os modos
+  bool alternarModo(bool modoAtual) {
+
+    bool estadoAtual = digitalRead(botao_modo);
+    bool podePressionar = true;
+    static bool ultimoEstado = HIGH;
+
+    if(estadoAtual == LOW && ultimoEstado == HIGH && podePressionar){
+
+      Serial.println("Botão Pressionado uma vez");
+      podePressionar = false; 
+    } 
+
+    if (estadoAtual == HIGH){
+      podePressionar = true;
+    }
+
+    ultimoEstado = estadoAtual;
+  
+  // O botão é ativo-baixo (LOW quando pressionado)
+  if (digitalRead(botao_modo) == LOW) {
+
+  display.clear();
+
+  // Inverte o modo
+  bool novoModo = !modoAtual;
+
+  if (novoModo) {
+    Serial.println("\n--- MODO: SEGURANÇA (Carro Parado) ---");
+
+    //client.publish("/ESP32/STATUS_MODO", "SEGURANCA");
+
+    display.setCursor(0,0); 
+    display.print("Modo: "); 
+    display.setCursor(0,1); 
+    display.print("Seguranca");
+  } else {
+    Serial.println("\n--- MODO: MANOBRA (Sensor de Ré) ---");
+
+    //client.publish("/ESP32/STATUS_MODO", "MANOBRA");
+
+    display.setCursor(0,0); 
+    display.print("Modo: "); 
+    display.setCursor(0,1); 
+    display.print("Manobra");
+  }
+
+
+  // Envia a mensagem de mudança imediatamente
+
+  // Desliga todos os atuadores na transição (Estado neutro)
+  digitalWrite(ledGreen, LOW);
+  digitalWrite(ledYellow, LOW);
+  digitalWrite(ledRed, LOW);
+  noTone(buzzer); // Usa noTone para desligar o buzzer
+
+  delay(1500); // Pausa para o usuário ver o modo
+
+  return novoModo;
+  
+ }
+ 
+ // Retorna o modo atual se o botão não foi pressionado ou está em debounce
+ return modoAtual;
+}
