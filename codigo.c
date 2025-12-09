@@ -13,10 +13,10 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h> 
 
-/*const char* WIFI_SSID = "luaninha";
-const char* WIFI_SENHA = "semsenha";
+const char* WIFI_SSID = "WIFI 2.4G";
+const char* WIFI_SENHA = "";
 
-const char* MQTT_SERVER_IP = "192.168.108.194";
+const char* MQTT_SERVER_IP = "";
 const int MQTT_PORT = 1883;
 
 const char* MQTT_TOPIC = "/ESP32/SENSORES";
@@ -28,7 +28,7 @@ long lastMsg = 0;
 int counter = 0;
 
 // Função para conectar ao Wi-Fi
-  void setup_wifi() {
+/*void setup_wifi() {
   delay(10);
   Serial.println();
   Serial.print("Conectando-se ao ");
@@ -100,9 +100,9 @@ const int ledYellow = 2;
 
 //Botão
 bool modo_seguranca = true; // true = SEGURANÇA, false = MANOBRA
-const int botao_modo = 32;
-const int botao_intrusao01 = 34;
-const int botao_intrusao02 = 35;
+const int botao_modo = 15;
+const int botao_intrusao01 = 13;
+const int botao_intrusao02 = 12;
 
 //Buzzer
 const int buzzer = 14;
@@ -163,13 +163,21 @@ void loop() {
   //int vibracao_status = digitalRead(SENSOR_VIBRACAO);
   //int inclinacao_status = digitalRead(SENSOR_INCLINACAO);
 
+  display.setCursor(0,0); 
+  display.print("PROJETO IOT"); 
+  display.setCursor(0, 1); 
+  display.print("TESTES COM LCD");  
+  delay(2000);  
+  display.clear(); 
+  delay(500);
+
   // Se estiver no modo MANOBRA (modo_seguranca == false)
   if (!modo_seguranca) {
     // Escreve o modo atual (linha 0)
     display.setCursor(0,0); 
     display.print("Modo: MANOBRA"); 
     display.setCursor(0,1); 
-    display.print("Distancia  "); display.print(distancia); display.print("cm");
+    display.print("Distancia"); display.print(distancia); display.print("cm");
 
   // Lógica do Sensor de Ré
   if (distancia > 300) {
@@ -212,18 +220,16 @@ void loop() {
   // Se estiver no modo SEGURANÇA (modo_seguranca == true)
   }else {
     // Checa os sensores de intrusão
-    bool intrusaoDetectada = (digitalRead(botao_intrusao01) == LOW || digitalRead(botao_intrusao02) == LOW);
+    bool intrusaoDetectada = (botao_intrusao01 == LOW || botao_intrusao02 == LOW);
 
     if (intrusaoDetectada) {
       // ALERTA DE INTRUSÃO
-      Serial.println("INTRUSAO DETECTADA");
+      Serial.println("INTRUSÃO DETECTADA");
 
       display.setCursor(0,0); 
       display.print("ALERTA"); 
       display.setCursor(0,1); 
-      display.print("!INTRUSAO!");
-
-      //client.publish("/ESP32/INTRUSAO", "ALARME_DISPARADO");
+      display.print("!!INTRUSÃO!!");
 
       // Ativa o alarme
       digitalWrite(ledGreen, LOW);
@@ -234,9 +240,9 @@ void loop() {
     } else {
       // MODO SEGURANÇA ATIVO (SEM INTRUSÃO)
       display.setCursor(0,0); 
-      display.print("Modo Seguranca"); 
+      display.print("Modo Segurança"); 
       display.setCursor(0,1); 
-      display.print("Ativo");
+      display.print("Ativo"); display.print(distancia); display.print("cm");
 
       // Mantém atuadores desligados e LED Verde ligado
       digitalWrite(ledGreen, HIGH);
@@ -292,20 +298,14 @@ void loop() {
 
   if (novoModo) {
     Serial.println("\n--- MODO: SEGURANÇA (Carro Parado) ---");
-
-    //client.publish("/ESP32/STATUS_MODO", "SEGURANCA");
-
     display.setCursor(0,0); 
-    display.print("Modo: "); 
+    display.print("Modo:"); 
     display.setCursor(0,1); 
-    display.print("Seguranca");
+    display.print("Segurança");
   } else {
     Serial.println("\n--- MODO: MANOBRA (Sensor de Ré) ---");
-
-    //client.publish("/ESP32/STATUS_MODO", "MANOBRA");
-
     display.setCursor(0,0); 
-    display.print("Modo: "); 
+    display.print("Modo:"); 
     display.setCursor(0,1); 
     display.print("Manobra");
   }
